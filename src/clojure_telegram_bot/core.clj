@@ -4,11 +4,13 @@
             [cheshire.core :as chsr]
             [clojure.string :as str]
             [meinside.clogram :as cg]
-            [net.cgrand.enlive-html :as html]))
+            [net.cgrand.enlive-html :as html]
+            [clojure-telegram-bot.config :as config]))
 
-(def token "1389261646:AAFb5UMGkAsgu2G8pXeqbRD3sMlf64TTYQM")
-(def interval 1)
-(def verbose? true)
+(def token config/token)
+(def interval config/interval)
+(def verbose? config/verbose?)
+
 (def bot (cg/new-bot token :verbose? verbose?))
 
 (defn html-parsing
@@ -31,4 +33,6 @@
   "main function"
   [& _]
   (println ">>> launching application...")
-  (cg/poll-updates bot interval html-parsing))
+  
+  (cg/poll-updates bot interval html-parsing)
+  )
