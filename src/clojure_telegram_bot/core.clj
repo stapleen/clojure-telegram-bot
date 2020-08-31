@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [meinside.clogram :as cg]
             [net.cgrand.enlive-html :as html]
+            [clojure.java.jdbc :as j]
             [clojure-telegram-bot.config :as config]))
 
 (def token config/token)
@@ -12,6 +13,8 @@
 (def verbose? config/verbose?)
 
 (def bot (cg/new-bot token :verbose? verbose?))
+
+(def db config/db-config)
 
 (defn html-parsing
   ""
@@ -33,6 +36,7 @@
   "main function"
   [& _]
   (println ">>> launching application...")
-  
-  (cg/poll-updates bot interval html-parsing)
-  )
+
+  (println (j/query db ["SELECT * FROM vacancies"]))
+
+  (cg/poll-updates bot interval html-parsing))
