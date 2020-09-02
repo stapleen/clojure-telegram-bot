@@ -60,14 +60,10 @@
         reply-to (get-in update [:message :message-id])
         text (get-in update [:message :text])]
 
-    (if (= text "/new")
-      (do
-        (html-parsing)))
-
-    (if (= text "/get")
-      (do
-        (get-vacancies chat-id)))
-  ))
+    (cond
+      (= text "/new") (html-parsing)
+      (= text "/get") (get-vacancies chat-id)
+      )))
 
 (defn -main
   "main function"
