@@ -22,6 +22,7 @@
 (defn insert-vacancy-url
   "insert urls in db"
   [vacancy-url]
+  ;; while one link
   (def url (subs (nth vacancy-url 0) url-vacancy-min-length url-vacancy-max-length))
   (jdbc/insert! db :vacancies {:vacancy_url url}))
 
@@ -29,12 +30,20 @@
   "function for parsing html"
   []
   (defn fetch-url [url] (html/html-resource (java.net.URL. url)))
+  
   (def html (fetch-url url-hh))
-
-  (def links (html/select html [:div.vacancy-serp-item__info :a]))
   (def vacancy-url (map #(get-in % [:attrs :href]) (html/select html [:div.vacancy-serp-item__info :a])))
 
   (insert-vacancy-url vacancy-url))
+
+(defn get-vacancies
+  "send list of vacancies"
+  [chat-id]
+  (def vacancy-list (jdbc/query db ["SELECT vacancy_url FROM vacancies WHERE is_show = 0"]))
+  ;; while one link
+  (def url-for-send (get-in (nth vacancy-list 0) [:vacancy_url]))
+
+  (cg/send-message bot chat-id url-for-send))
 
 (defn bot-response
   "bot response"
@@ -45,7 +54,12 @@
 
     (if (= text "/new")
       (do
-        (html-parsing)))))
+        (html-parsing)))
+
+    (if (= text "/get")
+      (do
+        (get-vacancies chat-id)))
+  ))
 
 (defn -main
   "main function"
