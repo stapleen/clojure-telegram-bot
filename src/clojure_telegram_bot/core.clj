@@ -30,19 +30,27 @@
   "function for parsing html"
   []
   (defn fetch-url [url] (html/html-resource (java.net.URL. url)))
-  
+
   (def html (fetch-url url-hh))
   (def vacancy-url (map #(get-in % [:attrs :href]) (html/select html [:div.vacancy-serp-item__info :a])))
 
   (insert-vacancy-url vacancy-url))
 
+(defn mark-vacancy-viewed
+  "mark vacancy as view in the database"
+  [id]
+  (jdbc/update! db :vacancies {:is_show 1} ["id = ?" id])
+  )
+
 (defn get-vacancies
   "send list of vacancies"
   [chat-id]
-  (def vacancy-list (jdbc/query db ["SELECT vacancy_url FROM vacancies WHERE is_show = 0"]))
+  (def vacancy-list (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ?" 0]))
   ;; while one link
   (def url-for-send (get-in (nth vacancy-list 0) [:vacancy_url]))
+  (def id-url (get-in (nth vacancy-list 0) [:id]))
 
+  (mark-vacancy-viewed id-url)
   (cg/send-message bot chat-id url-for-send))
 
 (defn bot-response
