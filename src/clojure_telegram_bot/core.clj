@@ -11,16 +11,30 @@
 (def token config/token)
 (def interval config/interval)
 (def verbose? config/verbose?)
-
 (def bot (cg/new-bot token :verbose? verbose?))
 
 (def db config/db-config)
 
+(def url-hh config/url)
+(def url-vacancy-min-length 0)
+(def url-vacancy-max-length 30)
+
 (defn insert-vacancy-url
   "insert urls in db"
   [vacancy-url]
-  (def url (nth vacancy-url 0))
+  (def url (subs (nth vacancy-url 0) url-vacancy-min-length url-vacancy-max-length))
   (jdbc/insert! db :vacancies {:vacancy_url url}))
+
+(defn html-parsing
+  "function for parsing html"
+  []
+  (defn fetch-url [url] (html/html-resource (java.net.URL. url)))
+  (def html (fetch-url url-hh))
+
+  (def links (html/select html [:div.vacancy-serp-item__info :a]))
+  (def vacancy-url (map #(get-in % [:attrs :href]) (html/select html [:div.vacancy-serp-item__info :a])))
+
+  (insert-vacancy-url vacancy-url))
 
 (defn bot-response
   "bot response"
@@ -29,35 +43,13 @@
         reply-to (get-in update [:message :message-id])
         text (get-in update [:message :text])]
 
-  (println "message" text)
-    ;; (cg/send-message bot chat-id (nth vacancy-url 0))
-    ))
-
-;; (defn html-parsing
-;;   "function for parsing html"
-;;   [bot update]
-;;   (let [chat-id (get-in update [:message :chat :id])
-;;         reply-to (get-in update [:message :message-id])
-;;         text (get-in update [:message :text])]
-
-;;     (defn fetch-url [url]
-;;       (html/html-resource (java.net.URL. url)))
-
-;;     (def html (fetch-url "https://hh.ru/search/vacancy?schedule=remote&clusters=true&area=1&no_magic=true&enable_snippets=true&salary=&st=searchVacancy&fromSearch=true&text=Frontend+%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%87%D0%B8%D0%BA&from=suggest_post"))
-;;     (def links (html/select html [:div.vacancy-serp-item__info :a]))
-;;     (def vacancy-url (map #(get-in % [:attrs :href]) (html/select html [:div.vacancy-serp-item__info :a])))
-;;     (insert-vacancy-url vacancy-url)
-
-;;     ;; (cg/send-message bot chat-id (nth vacancy-url 0))
-;;     ))
-
-
+    (if (= text "/new")
+      (do
+        (html-parsing)))))
 
 (defn -main
   "main function"
   [& _]
   (println ">>> launching application...")
-
-  ;; (println (jdbc/query db ["SELECT * FROM vacancies"]))
 
   (cg/poll-updates bot interval bot-response))
