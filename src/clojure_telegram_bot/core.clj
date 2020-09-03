@@ -22,9 +22,9 @@
 (defn insert-vacancy-url
   "insert urls in db"
   [vacancy-url]
-  ;; while one link
-  (def url (subs (nth vacancy-url 0) url-vacancy-min-length url-vacancy-max-length))
-  (jdbc/insert! db :vacancies {:vacancy_url url}))
+
+  (def url-list (mapv #(subs % url-vacancy-min-length url-vacancy-max-length) vacancy-url))
+  (jdbc/insert-multi! db :vacancies [:vacancy_url] (mapv #(vector %) url-list)))
 
 (defn html-parsing
   "function for parsing html"
@@ -32,7 +32,8 @@
   (defn fetch-url [url] (html/html-resource (java.net.URL. url)))
 
   (def html (fetch-url url-hh))
-  (def vacancy-url (map #(get-in % [:attrs :href]) (html/select html [:div.vacancy-serp-item__info :a])))
+  (def links (html/select html [:div.vacancy-serp-item__info :a]))
+  (def vacancy-url (mapv #(get-in % [:attrs :href]) links))
 
   (insert-vacancy-url vacancy-url))
 
