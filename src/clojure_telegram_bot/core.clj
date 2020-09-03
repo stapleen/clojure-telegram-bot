@@ -24,7 +24,7 @@
   [vacancies-url]
   (mapv #(subs % url-vacancy-min-length url-vacancy-max-length) vacancies-url))
 
-(defn insert-vacancies-urls
+(defn insert-vacancies-url
   "insert urls in db"
   [vacancies-url chat-id]
   (def url-list (do-short-links vacancies-url))
@@ -41,7 +41,7 @@
   (def links (html/select html [:div.vacancy-serp-item__info :a]))
   (def vacancies-url (mapv #(get-in % [:attrs :href]) links))
 
-  (insert-vacancies-urls vacancies-url chat-id))
+  (insert-vacancies-url vacancies-url chat-id))
 
 (defn mark-vacancy-viewed
   "mark vacancy as view in the database"
