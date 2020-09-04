@@ -19,6 +19,8 @@
 (def url-vacancy-min-length 0)
 (def url-vacancy-max-length 30)
 
+(def info "Список доступных команд\n/set - отправить ссылку на поиск вакансий\n/update - обновить список вакансий\n/get - получить новые вакансии\n/cancel - сбросить просмотренные вакансии")
+
 (defn do-short-links
   "shorten links length"
   [vacancies-url]
@@ -72,6 +74,7 @@
     (cond
       (= text "/new") (html-parsing chat-id)
       (= text "/get") (send-vacancies chat-id)
+      :else (cg/send-message bot chat-id info)
       )))
 
 (defn -main
