@@ -56,9 +56,10 @@
   (if (= vacancy-list [])
     (do (cg/send-message bot chat-id "Все вакансии просмотрены"))
     (do
-      (def urls-for-send (mapv #(get-in % [:vacancy_url]) vacancy-list))
+      (def vacancy-urls-list (mapv #(get-in % [:vacancy_url]) vacancy-list))
       (def id-url-for-send (mapv #(get-in % [:id]) vacancy-list))
       (mapv #(mark-vacancy-viewed %) id-url-for-send)
+      (def urls-for-send (clojure.string/join "\n" vacancy-urls-list))
       (cg/send-message bot chat-id urls-for-send))))
 
 (defn bot-response
