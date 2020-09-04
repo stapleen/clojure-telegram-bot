@@ -48,16 +48,18 @@
   [id]
   (jdbc/update! db :vacancies {:is_show 1} ["id = ?" id]))
 
-(defn get-vacancies
+(defn send-vacancies
   "send list of vacancies"
   [chat-id]
   (def vacancy-list (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ?" 0]))
-  ;; while one link
-  (def url-for-send (get-in (nth vacancy-list 0) [:vacancy_url]))
-  (def id-url (get-in (nth vacancy-list 0) [:id]))
 
-  (mark-vacancy-viewed id-url)
-  (cg/send-message bot chat-id url-for-send))
+  (if (= vacancy-list [])
+    (do (cg/send-message bot chat-id "Все вакансии просмотрены"))
+    (do
+      (def urls-for-send (mapv #(get-in % [:vacancy_url]) vacancy-list))
+      (def id-url-for-send (mapv #(get-in % [:id]) vacancy-list))
+      (mapv #(mark-vacancy-viewed %) id-url-for-send)
+      (cg/send-message bot chat-id urls-for-send))))
 
 (defn bot-response
   "bot response"
@@ -68,7 +70,7 @@
 
     (cond
       (= text "/new") (html-parsing chat-id)
-      (= text "/get") (get-vacancies chat-id)
+      (= text "/get") (send-vacancies chat-id)
       )))
 
 (defn -main
