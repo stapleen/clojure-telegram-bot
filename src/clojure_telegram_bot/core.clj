@@ -64,6 +64,12 @@
       (def urls-for-send (clojure.string/join "\n" vacancy-urls-list))
       (cg/send-message bot chat-id urls-for-send))))
 
+(defn reset-viewed-vacancy
+  "reset viewed vacancies"
+  [chat-id]
+  (jdbc/update! db :vacancies {:is_show 0} ["is_show = ?" 1])
+  (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))
+
 (defn bot-response
   "bot response"
   [bot update]
@@ -72,8 +78,9 @@
         text (get-in update [:message :text])]
 
     (cond
-      (= text "/new") (html-parsing chat-id)
+      (= text "/update") (html-parsing chat-id)
       (= text "/get") (send-vacancies chat-id)
+      (= text "/cancel") (reset-viewed-vacancy chat-id)
       :else (cg/send-message bot chat-id info)
       )))
 
