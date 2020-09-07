@@ -9,7 +9,8 @@
                    [cheshire "5.9.0"]
                    [enlive "1.1.6"]
                    [org.clojure/java.jdbc "0.7.11"]
-                   [mysql/mysql-connector-java "8.0.21"]]
+                   [mysql/mysql-connector-java "8.0.21"]
+                   [comb "0.1.1"]]
   :main ^:skip-aot clojure-telegram-bot.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all
