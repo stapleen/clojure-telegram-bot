@@ -3,14 +3,11 @@
   (:require [clj-http.client :as client]
             [cheshire.core :as chsr]
             [clojure.string :as str]
-            [clojure.data :as data]
             [meinside.clogram :as cg]
             [net.cgrand.enlive-html :as html]
             [comb.template :as template]
             [clojure.java.jdbc :as jdbc]
             [clojure-telegram-bot.config :as config]))
-
-(use 'clojure.data)
 
 (def token config/token)
 (def interval config/interval)
@@ -35,45 +32,11 @@
   [vacancies-url chat-id]
   (def url-list (do-short-links vacancies-url))
 
-  ;; (jdbc/insert-multi! db :vacancies [:vacancy_url] (mapv #(vector %) url-list))
+  (def urls-apostrophe (mapv #(template/eval "('<%= url %>')" {:url %}) url-list))
+  (def urls-for-insert (str/join "," urls-apostrophe))
+  (def query (template/eval "INSERT IGNORE INTO vacancies (vacancy_url) VALUES <%= params %>" {:params urls-for-insert}))
 
-
-  (def urls-apostrophe (mapv #(template/eval "'<%= name %>'" {:name %}) url-list))
-  (def urls (clojure.string/join ", " urls-apostrophe))
-  (def query (template/eval "SELECT vacancy_url FROM vacancies WHERE vacancy_url IN (<%= params %>)" {:params urls}))
-  (def urls-in-db (jdbc/query db [query]))
-  (def urls-in-db-list (mapv #(get-in % [:vacancy_url]) urls-in-db))
-  (def urls-in-db-list-apostrophe (mapv #(template/eval "'<%= name %>'" {:name %}) urls-in-db-list))
-
-
-  (def difference (diff urls-in-db-list url-list))
-
-  ;; (println "diff1" (nth difference 0))
-  ;; (println "=====================")
-  ;; (println "diff2" (nth difference 1))
-  ;; (println "=====================")
-  ;; (println "diff3" (nth difference 2))
-  ;;
-  ;;     
-
-;; (println "1" (set urls-apostrophe))
-;; (println "2" (set urls-in-db-list-apostrophe))
-
-
-(println "diff" (diff (set urls-apostrophe) (set urls-in-db-list-apostrophe)))
-
-
-     (if (= (nth difference 2) nil)
-       (do (jdbc/insert-multi! db :vacancies [:vacancy_url] (mapv #(vector %) url-list))))
-
-
-
-
-
-
-
-
-
+  (jdbc/execute! db query)
   (cg/send-message bot chat-id "Список вакансий сформирован"))
 
 (defn html-parsing
@@ -103,7 +66,7 @@
       (def vacancy-urls-list (mapv #(get-in % [:vacancy_url]) vacancy-list))
       (def id-url-for-send (mapv #(get-in % [:id]) vacancy-list))
       (mapv #(mark-vacancy-viewed %) id-url-for-send)
-      (def urls-for-send (clojure.string/join "\n" vacancy-urls-list))
+      (def urls-for-send (str/join "\n" vacancy-urls-list))
       (cg/send-message bot chat-id urls-for-send))))
 
 (defn reset-viewed-vacancy
