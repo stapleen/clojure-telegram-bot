@@ -1,13 +1,16 @@
 (ns clojure-telegram-bot.core
   (:gen-class)
-  (:require [clj-http.client :as client]
-            [cheshire.core :as chsr]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [meinside.clogram :as cg]
             [net.cgrand.enlive-html :as html]
             [comb.template :as template]
             [clojure.java.jdbc :as jdbc]
             [clojure-telegram-bot.config :as config]))
+
+(def token config/token)
+(def interval config/interval)
+(def verbose? config/verbose?)
+(def bot (cg/new-bot token :verbose? verbose?))
 
 (def db config/db-config)
 (def info "Список доступных команд:\n/set - отправить ссылку на поиск вакансий\n/update - обновить список вакансий\n/get - получить новые вакансии\n/cancel - сбросить просмотренные вакансии")
@@ -45,8 +48,10 @@
          (insert-vacancies-url vacancies-url chat-id id))))))
 
 (defn mark-vacancy-viewed
-  [id]
-  (jdbc/update! db :vacancies {:is_show 1} ["id = ?" id]))
+  [id-list]
+  (let [id (str/join "," id-list)
+        query (template/eval "UPDATE vacancies SET is_show=1 WHERE id IN (<%= params %>)" {:params id})]
+    (jdbc/execute! db query)))
 
 (defn send-vacancies
   [chat-id]
@@ -61,10 +66,9 @@
             (do
               (let [url-list (mapv #(get-in % [:vacancy_url]) vacancies-data)
                     id-list (mapv #(get-in % [:id]) vacancies-data)]
-                (mapv #(mark-vacancy-viewed %) id-list)
-                ;; переписать это
+                (mark-vacancy-viewed id-list)
                 (let [urls (str/join "\n" url-list)]
-                (cg/send-message bot chat-id urls))))))))))
+                  (cg/send-message bot chat-id urls))))))))))
 
 (defn reset-viewed-vacancy
   [chat-id]
@@ -88,14 +92,12 @@
     (cg/send-message bot chat-id "Ссылка добавлена")))
 
 (defn bot-response
-  "bot response"
   [bot update]
   (let [chat-id (get-in update [:message :chat :id])
         reply-to (get-in update [:message :message-id])
-        text (get-in update [:message :text])]
-
-    (def user-message (str/split text  #" "))
-    (def command (nth user-message 0))
+        text (get-in update [:message :text])
+        user-message (str/split text  #" ")
+        command (nth user-message 0)]
 
     (cond
       (= command "/set") (set-url chat-id user-message)
@@ -108,9 +110,4 @@
   "main function"
   [& _]
   (println ">>> launching application...")
-
-  (let [token config/token
-        interval config/interval
-        verbose? config/verbose?
-        bot (cg/new-bot token :verbose? verbose?)]
-        (cg/poll-updates bot interval bot-response)))
+  (cg/poll-updates bot interval bot-response))
