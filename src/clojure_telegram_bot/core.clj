@@ -32,9 +32,9 @@
   [vacancies-url chat-id]
   (def url-list (do-short-links vacancies-url))
 
-  (def urls-apostrophe (mapv #(template/eval "('<%= url %>')" {:url %}) url-list))
+  (def urls-apostrophe (mapv #(template/eval "('<%= url %>', <%= id %>)" {:url %, :id chat-id}) url-list))
   (def urls-for-insert (str/join "," urls-apostrophe))
-  (def query (template/eval "INSERT IGNORE INTO vacancies (vacancy_url) VALUES <%= params %>" {:params urls-for-insert}))
+  (def query (template/eval "INSERT IGNORE INTO vacancies (vacancy_url, user_id) VALUES <%= params %>" {:params urls-for-insert}))
 
   (jdbc/execute! db query)
   (cg/send-message bot chat-id "Список вакансий сформирован"))
@@ -75,6 +75,16 @@
   (jdbc/update! db :vacancies {:is_show 0} ["is_show = ?" 1])
   (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))
 
+  ;; (defn set-url
+  ;;   "save url in db"
+  ;;   [text chat-id]
+  ;;   ;; (println "url" url)
+
+
+  ;;   ;; (jdbc/update! db :vacancies {:is_show 0} ["is_show = ?" 1])
+  ;;   ;; (cg/send-message bot chat-id "Список просмотренных вакансий сброшен")
+  ;;   )
+
 (defn bot-response
   "bot response"
   [bot update]
@@ -82,12 +92,14 @@
         reply-to (get-in update [:message :message-id])
         text (get-in update [:message :text])]
 
-    (cond
-      (= text "/update") (html-parsing chat-id)
-      (= text "/get") (send-vacancies chat-id)
-      (= text "/cancel") (reset-viewed-vacancy chat-id)
-      :else (cg/send-message bot chat-id info)
-      )))
+    ;; (if (= text "/city")
+    ;;   (do (cg/send-message bot chat-id "Все вакансии просмотрены")))
+
+      (cond
+        (= text "/update") (html-parsing chat-id)
+        (= text "/get") (send-vacancies chat-id)
+        (= text "/cancel") (reset-viewed-vacancy chat-id)
+        :else (cg/send-message bot chat-id info))))
 
 (defn -main
   "main function"
