@@ -16,7 +16,6 @@
 
 (def db config/db-config)
 
-(def url-hh config/url)
 (def url-vacancy-min-length 0)
 (def url-vacancy-max-length 30)
 
@@ -29,26 +28,34 @@
 
 (defn insert-vacancies-url
   "insert urls in db"
-  [vacancies-url chat-id]
+  [vacancies-url chat-id user-id]
   (def url-list (do-short-links vacancies-url))
 
-  (def urls-apostrophe (mapv #(template/eval "('<%= url %>', <%= id %>)" {:url %, :id chat-id}) url-list))
+  (def urls-apostrophe (mapv #(template/eval "('<%= url %>', <%= id %>)" {:url %, :id user-id}) url-list))
   (def urls-for-insert (str/join "," urls-apostrophe))
   (def query (template/eval "INSERT IGNORE INTO vacancies (vacancy_url, user_id) VALUES <%= params %>" {:params urls-for-insert}))
 
   (jdbc/execute! db query)
   (cg/send-message bot chat-id "Список вакансий сформирован"))
 
+(defn fetch-url [url] (html/html-resource (java.net.URL. url)))
+
 (defn html-parsing
   "function for parsing html"
   [chat-id]
-  (defn fetch-url [url] (html/html-resource (java.net.URL. url)))
+  (def data-in-db (jdbc/query db ["SELECT id, url FROM users WHERE chat_id = ?" chat-id]))
 
-  (def html (fetch-url url-hh))
-  (def links (html/select html [:div.vacancy-serp-item__info :a]))
-  (def vacancies-url (mapv #(get-in % [:attrs :href]) links))
+  (if (= data-in-db ())
+    (do (cg/send-message bot chat-id "Сначала нужно добавить ссылку"))
+    (do
+      (def url-hh (get-in (nth data-in-db 0) [:url]))
+      (def user-id (get-in (nth data-in-db 0) [:id]))
 
-  (insert-vacancies-url vacancies-url chat-id))
+      (def html (fetch-url url-hh))
+      (def links (html/select html [:div.vacancy-serp-item__info :a]))
+      (def vacancies-url (mapv #(get-in % [:attrs :href]) links))
+      (insert-vacancies-url vacancies-url chat-id user-id))
+    ))
 
 (defn mark-vacancy-viewed
   "mark vacancy as view in the database"
@@ -58,31 +65,39 @@
 (defn send-vacancies
   "send list of vacancies"
   [chat-id]
-  (def vacancy-list (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ? AND user_id = ?" 0 chat-id]))
+  (def user-data-in-db (jdbc/query db ["SELECT id FROM users WHERE chat_id = ?" chat-id]))
 
-  (if (= vacancy-list [])
-    (do (cg/send-message bot chat-id "Все вакансии просмотрены"))
+  (if (= user-data-in-db ())
+    (do (cg/send-message bot chat-id "Сначала нужно добавить ссылку"))
     (do
-      (def vacancy-urls-list (mapv #(get-in % [:vacancy_url]) vacancy-list))
-      (def id-url-for-send (mapv #(get-in % [:id]) vacancy-list))
-      (mapv #(mark-vacancy-viewed %) id-url-for-send)
-      (def urls-for-send (str/join "\n" vacancy-urls-list))
-      (cg/send-message bot chat-id urls-for-send))))
+      (def user-data-id (get-in (nth user-data-in-db 0) [:id]))
+      (def vacancy-list (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ? AND user_id = ?" 0 user-data-id]))
+      (if (= vacancy-list [])
+        (do (cg/send-message bot chat-id "Все вакансии просмотрены"))
+        (do
+          (def vacancy-urls-list (mapv #(get-in % [:vacancy_url]) vacancy-list))
+          (def id-url-for-send (mapv #(get-in % [:id]) vacancy-list))
+          (mapv #(mark-vacancy-viewed %) id-url-for-send)
+          (def urls-for-send (str/join "\n" vacancy-urls-list))
+          (cg/send-message bot chat-id urls-for-send))))))
 
 (defn reset-viewed-vacancy
   "reset viewed vacancies"
   [chat-id]
-  (jdbc/update! db :vacancies {:is_show 0} ["is_show = ? AND user_id = ?" 1 chat-id])
-  (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))
+  (def data-db (jdbc/query db ["SELECT id FROM users WHERE chat_id = ?" chat-id]))
 
-  (defn set-url
-    "save url in db"
-    [chat-id user-message]
-    (def user-text (str/trim (nth user-message 1)))
+  (if (= data-db ())
+    (do (cg/send-message bot chat-id "Сначала нужно добавить ссылку"))
+    (do
+      (def user-id-db (get-in (nth data-in-db 0) [:id]))
+      (jdbc/update! db :vacancies {:is_show 0} ["is_show = ? AND user_id = ?" 1 user-id-db])
+      (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))))
 
-    (def url-for-parsing-in-db (jdbc/query db ["SELECT url FROM users WHERE chat_id = ?" chat-id]))
-
-    (println "db" url-for-parsing-in-db)
+(defn set-url
+  "save url in db"
+  [chat-id user-message]
+  (def user-text (str/trim (nth user-message 1)))
+  (def url-for-parsing-in-db (jdbc/query db ["SELECT url FROM users WHERE chat_id = ?" chat-id]))
 
   (if (= url-for-parsing-in-db ())
     (do (jdbc/execute! db ["INSERT INTO users (chat_id, url) VALUES(?, ?)" chat-id user-text]))
