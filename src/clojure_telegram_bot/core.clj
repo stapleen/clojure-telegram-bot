@@ -58,7 +58,7 @@
 (defn send-vacancies
   "send list of vacancies"
   [chat-id]
-  (def vacancy-list (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ?" 0]))
+  (def vacancy-list (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ? AND user_id = ?" 0 chat-id]))
 
   (if (= vacancy-list [])
     (do (cg/send-message bot chat-id "Все вакансии просмотрены"))
@@ -72,7 +72,7 @@
 (defn reset-viewed-vacancy
   "reset viewed vacancies"
   [chat-id]
-  (jdbc/update! db :vacancies {:is_show 0} ["is_show = ?" 1])
+  (jdbc/update! db :vacancies {:is_show 0} ["is_show = ? AND user_id = ?" 1 chat-id])
   (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))
 
   ;; (defn set-url
