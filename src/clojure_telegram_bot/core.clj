@@ -75,15 +75,19 @@
   (jdbc/update! db :vacancies {:is_show 0} ["is_show = ? AND user_id = ?" 1 chat-id])
   (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))
 
-  ;; (defn set-url
-  ;;   "save url in db"
-  ;;   [text chat-id]
-  ;;   ;; (println "url" url)
+  (defn set-url
+    "save url in db"
+    [chat-id user-message]
+    (def user-text (str/trim (nth user-message 1)))
 
+    (def url-for-parsing-in-db (jdbc/query db ["SELECT url FROM users WHERE chat_id = ?" chat-id]))
 
-  ;;   ;; (jdbc/update! db :vacancies {:is_show 0} ["is_show = ?" 1])
-  ;;   ;; (cg/send-message bot chat-id "Список просмотренных вакансий сброшен")
-  ;;   )
+    (println "db" url-for-parsing-in-db)
+
+  (if (= url-for-parsing-in-db ())
+    (do (jdbc/execute! db ["INSERT INTO users (chat_id, url) VALUES(?, ?)" chat-id user-text]))
+    (do (jdbc/update! db :users {:url user-text} ["chat_id = ?" chat-id])))
+  (cg/send-message bot chat-id "Ссылка добавлена"))
 
 (defn bot-response
   "bot response"
@@ -92,14 +96,15 @@
         reply-to (get-in update [:message :message-id])
         text (get-in update [:message :text])]
 
-    ;; (if (= text "/city")
-    ;;   (do (cg/send-message bot chat-id "Все вакансии просмотрены")))
+    (def user-message (str/split text  #" "))
+    (def command (nth user-message 0))
 
-      (cond
-        (= text "/update") (html-parsing chat-id)
-        (= text "/get") (send-vacancies chat-id)
-        (= text "/cancel") (reset-viewed-vacancy chat-id)
-        :else (cg/send-message bot chat-id info))))
+    (cond
+      (= command "/set") (set-url chat-id user-message)
+      (= command "/update") (html-parsing chat-id)
+      (= command "/get") (send-vacancies chat-id)
+      (= command "/cancel") (reset-viewed-vacancy chat-id)
+      :else (cg/send-message bot chat-id info))))
 
 (defn -main
   "main function"
