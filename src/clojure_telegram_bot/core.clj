@@ -52,7 +52,7 @@
       (let
        [url-hh (get-in (nth user-data 0) [:url])
         user-id (get-in (nth user-data 0) [:id])
-        vacancies-url (parse-html (fetch-url url-hh))]
+        vacancies-url (-> url-hh fetch-url parse-html)]
         (insert-vacancies-url vacancies-url chat-id user-id)))))
 
 (defn mark-vacancy-viewed
