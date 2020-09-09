@@ -49,8 +49,11 @@
   (let [user-data (get-user-data chat-id)]
     (if (nil? user-data)
       (cg/send-message bot chat-id "Сначала нужно добавить ссылку")
-      (let [vacancies-url (parse-html (fetch-url (get-in (nth user-data 0) [:url])))]
-        (insert-vacancies-url vacancies-url chat-id (get-in (nth user-data 0) [:id]))))))
+      (let
+       [url-hh (get-in (nth user-data 0) [:url])
+        user-id (get-in (nth user-data 0) [:id])
+        vacancies-url (parse-html (fetch-url url-hh))]
+        (insert-vacancies-url vacancies-url chat-id user-id)))))
 
 (defn mark-vacancy-viewed
   [id-list]
