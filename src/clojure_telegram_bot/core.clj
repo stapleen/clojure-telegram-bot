@@ -32,20 +32,25 @@
 
 (defn fetch-url
   [url]
-  (html/html-resource (java.net.URL. url)))
+  (html/html-resource (java.net.URL. url)))   
 
-(defn html-parsing
+(defn parse-html
+  [html]
+  (let [links (html/select html [:div.vacancy-serp-item__info :a])]
+    (mapv #(get-in % [:attrs :href]) links)))
+
+(defn get-user-data
   [chat-id]
   (let [user-data (jdbc/query db ["SELECT id, url FROM users WHERE chat_id = ?" chat-id])]
-   (if (= user-data ())
-     (do (cg/send-message bot chat-id "Сначала нужно добавить ссылку"))
-     (do
-       (let [url-hh (get-in (nth user-data 0) [:url])
-             id (get-in (nth user-data 0) [:id])
-             html (fetch-url url-hh)
-             links (html/select html [:div.vacancy-serp-item__info :a])
-             vacancies-url (mapv #(get-in % [:attrs :href]) links)]
-         (insert-vacancies-url vacancies-url chat-id id))))))
+    (if (empty? user-data) nil user-data)))
+
+(defn update-action
+  [chat-id]
+  (let [user-data (get-user-data chat-id)]
+    (if (nil? user-data)
+      (cg/send-message bot chat-id "Сначала нужно добавить ссылку")
+      (let [vacancies-url (parse-html (fetch-url (get-in (nth user-data 0) [:url])))]
+        (insert-vacancies-url vacancies-url chat-id (get-in (nth user-data 0) [:id]))))))
 
 (defn mark-vacancy-viewed
   [id-list]
@@ -55,40 +60,35 @@
 
 (defn send-vacancies
   [chat-id]
-  (let [user-data (jdbc/query db ["SELECT id FROM users WHERE chat_id = ?" chat-id])]
-    (if (= user-data ())
-      (do (cg/send-message bot chat-id "Сначала нужно добавить ссылку"))
-      (do
-        (let [id (get-in (nth user-data 0) [:id])
-              vacancies-data (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ? AND user_id = ?" 0 id])]
-          (if (= vacancies-data [])
-            (do (cg/send-message bot chat-id "Все вакансии просмотрены"))
-            (do
-              (let [url-list (mapv #(get-in % [:vacancy_url]) vacancies-data)
-                    id-list (mapv #(get-in % [:id]) vacancies-data)]
-                (mark-vacancy-viewed id-list)
-                (let [urls (str/join "\n" url-list)]
-                  (cg/send-message bot chat-id urls))))))))))
+  (let [user-data (get-user-data chat-id)]
+    (if (nil? user-data)
+      (cg/send-message bot chat-id "Сначала нужно добавить ссылку")
+       (let [id (get-in (nth user-data 0) [:id])
+             vacancies-data (jdbc/query db ["SELECT id, vacancy_url FROM vacancies WHERE is_show = ? AND user_id = ?" 0 id])]
+         (if (empty? vacancies-data)
+           (cg/send-message bot chat-id "Все вакансии просмотрены")
+           (let [url-list (mapv #(get-in % [:vacancy_url]) vacancies-data)
+                 id-list (mapv #(get-in % [:id]) vacancies-data)]
+             (mark-vacancy-viewed id-list)
+             (let [urls (str/join "\n" url-list)]
+               (cg/send-message bot chat-id urls))))))))
 
 (defn reset-viewed-vacancy
   [chat-id]
-  (let [user-data (jdbc/query db ["SELECT id FROM users WHERE chat_id = ?" chat-id])]
-
-  (if (= user-data ())
-    (do (cg/send-message bot chat-id "Сначала нужно добавить ссылку"))
-    (do
+  (let [user-data (get-user-data chat-id)]
+    (if (nil? user-data)
+      (cg/send-message bot chat-id "Сначала нужно добавить ссылку")
       (let [id (get-in (nth user-data 0) [:id])]
         (jdbc/update! db :vacancies {:is_show 0} ["is_show = ? AND user_id = ?" 1 id])
-        (cg/send-message bot chat-id "Список просмотренных вакансий сброшен"))))))
+        (cg/send-message bot chat-id "Список просмотренных вакансий сброшен")))))
 
 (defn set-url
   [chat-id user-message]
   (let [user-text (str/trim (nth user-message 1))
         url-in-db (jdbc/query db ["SELECT url FROM users WHERE chat_id = ?" chat-id])]
-
-    (if (= url-in-db ())
-      (do (jdbc/execute! db ["INSERT INTO users (chat_id, url) VALUES(?, ?)" chat-id user-text]))
-      (do (jdbc/update! db :users {:url user-text} ["chat_id = ?" chat-id])))
+    (if (empty? url-in-db)
+      (jdbc/execute! db ["INSERT INTO users (chat_id, url) VALUES(?, ?)" chat-id user-text])
+      (jdbc/update! db :users {:url user-text} ["chat_id = ?" chat-id]))
     (cg/send-message bot chat-id "Ссылка добавлена")))
 
 (defn bot-response
@@ -98,10 +98,9 @@
         text (get-in update [:message :text])
         user-message (str/split text  #" ")
         command (nth user-message 0)]
-
     (cond
       (= command "/set") (set-url chat-id user-message)
-      (= command "/update") (html-parsing chat-id)
+      (= command "/update") (update-action chat-id)
       (= command "/get") (send-vacancies chat-id)
       (= command "/cancel") (reset-viewed-vacancy chat-id)
       :else (cg/send-message bot chat-id info))))
