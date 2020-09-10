@@ -1,0 +1,16 @@
+  version: '3.8'
+  services:
+    db:
+      image: mysql
+      environment:
+        - MYSQL_ROOT_PASSWORD=root
+      ports:
+        - 3306:3306
+      volumes: 
+        - "/path/to/clojure_bot_db:/var/lib/mysql"
+    bot:
+      build: .
+      links:
+        - db
+      depends_on:
+        - db
