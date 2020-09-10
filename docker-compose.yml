@@ -4,10 +4,11 @@
       image: mysql
       environment:
         - MYSQL_ROOT_PASSWORD=root
+        - MYSQL_DATABASE=clojure_bot_telegram
       ports:
         - 3306:3306
-      volumes: 
-        - "/path/to/clojure_bot_db:/var/lib/mysql"
+      volumes:
+        - "./db:/docker-entrypoint-initdb.d"
     bot:
       build: .
       links:
